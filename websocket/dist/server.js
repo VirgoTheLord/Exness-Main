@@ -47,7 +47,6 @@ redis.subscribe("trades", (err) => {
 });
 redis.on("message", (channel, message) => {
     if (channel === "trades") {
-        console.log(message);
         wss.clients.forEach((client) => {
             if (client.readyState === ws_1.default.OPEN) {
                 client.send(message);

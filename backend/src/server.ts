@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import pkg from "pg";
+import userRouter from "./routes/userRoutes.js";
+import orderRouter from "./routes/orderRoutes.js";
 
 const { Pool } = pkg;
 const pool = new Pool({
@@ -15,6 +17,8 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+app.use("/user", userRouter);
+app.use("/order", orderRouter);
 const queries: Record<string, string> = {
   "1m": "trades_1m",
   "5m": "trades_5m",
