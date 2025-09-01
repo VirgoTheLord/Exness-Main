@@ -2,7 +2,7 @@ import Redis from "ioredis";
 import pkg from "pg";
 
 const { Pool } = pkg;
-const markets = ["btusdt", "ethusdt", "solusdt"];
+const markets = ["btcusdt", "ethusdt", "solusdt"];
 const streams = markets.map((m) => `${m}@trade`).join("/");
 const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
 
@@ -44,9 +44,9 @@ binanceWs.onmessage = (event) => {
       const price = trade.p;
       const symbol = trade.s;
 
-      const spread = 0.025;
-      const ask = price * (1 + 1 / spread);
-      const bid = price * (1 - 1 / spread);
+      const spread = 0.01;
+      const ask = price * (1 + spread / 2);
+      const bid = price * (1 - spread / 2);
 
       const updatedTrade = { ...trade, ask, bid, symbol };
       updates.push({ trade: updatedTrade });

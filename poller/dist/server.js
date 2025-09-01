@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const ioredis_1 = __importDefault(require("ioredis"));
 const pg_1 = __importDefault(require("pg"));
 const { Pool } = pg_1.default;
-const markets = ["btusdt", "ethusdt", "solusdt"];
+const markets = ["btcusdt", "ethusdt", "solusdt"];
 const streams = markets.map((m) => `${m}@trade`).join("/");
 const url = `wss://stream.binance.com:9443/stream?streams=${streams}`;
 const pool = new Pool({
@@ -47,9 +47,9 @@ binanceWs.onmessage = (event) => {
             const trade = message.data;
             const price = trade.p;
             const symbol = trade.s;
-            const spread = 0.025;
-            const ask = price * (1 + 1 / spread);
-            const bid = price * (1 - 1 / spread);
+            const spread = 0.01;
+            const ask = price * (1 + spread / 2);
+            const bid = price * (1 - spread / 2);
             const updatedTrade = Object.assign(Object.assign({}, trade), { ask, bid, symbol });
             updates.push({ trade: updatedTrade });
             redis.publish("trades", JSON.stringify(updatedTrade));

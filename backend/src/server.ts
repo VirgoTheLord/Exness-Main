@@ -34,7 +34,6 @@ app.get("/candles", async (req, res) => {
       `SELECT timestamp,symbol,open_price,close_price,high_price,low_price FROM ${queryInterval} WHERE symbol=$1 ORDER BY timestamp DESC LIMIT 100`,
       [symbol.toUpperCase()]
     );
-    console.log(response.rows.reverse());
 
     res.json(response.rows.reverse());
   } catch (error) {

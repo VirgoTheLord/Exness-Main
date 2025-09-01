@@ -1,9 +1,8 @@
 "use client";
-import axios from "axios";
-import React, { useEffect, useRef, useState } from "react";
-import { candles, prices } from "../types/Alltypes";
+import React, { useState } from "react";
 import Charts from "../components/Charts";
 import { useCandles } from "../hooks/useCandles";
+import PricesTable from "../components/PricesTable";
 
 const page = () => {
   const [selectedInterval, setSelectedInterval] = useState("1m");
@@ -44,6 +43,7 @@ const page = () => {
         </div>
         <div className="w-3/4 pl-2">
           <Charts candles={candles} height={600} />
+          <PricesTable />
         </div>
       </div>
     </div>
