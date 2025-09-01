@@ -5,9 +5,15 @@ import { currentOrders, users } from "../data";
 import { prisma } from "../config/db";
 import { idText } from "typescript";
 const redis = new Redis();
+const redisQ = new Redis();
 
 const orderRouter = express.Router();
 const latestPrices: Record<string, LatestPrices> = {};
+
+const pushNotification = (userId: number, message: string) => {
+  const payload = JSON.stringify({ userId, message, timestamp: Date.now() });
+  redisQ.lpush("order_notifications", payload);
+};
 
 redis.subscribe("trades");
 redis.on("message", (channel, message) => {
@@ -36,6 +42,10 @@ redis.on("message", (channel, message) => {
         userInMemory.balance +=
           (order.entryPrice - order.stopLoss) * order.quantity +
           (order.margin ?? 0);
+        pushNotification(
+          order.id,
+          `Long order stopped out at ${order.stopLoss}`
+        );
         currentOrders.splice(i, 1);
         continue;
       }
@@ -43,6 +53,10 @@ redis.on("message", (channel, message) => {
         userInMemory.balance +=
           (order.takeProfit - order.entryPrice) * order.quantity +
           (order.margin ?? 0);
+        pushNotification(
+          order.id,
+          `Long order take profit hit at ${order.takeProfit}`
+        );
         currentOrders.splice(i, 1);
         continue;
       }
@@ -51,6 +65,7 @@ redis.on("message", (channel, message) => {
         bidPrice <= order.liquidationPrice
       ) {
         console.log(`Order Liquidated ${order.type}`);
+        pushNotification(order.id, `Long order liquidated at ${bidPrice}`);
         currentOrders.splice(i, 1);
         continue;
       }
@@ -59,6 +74,10 @@ redis.on("message", (channel, message) => {
         userInMemory.balance +=
           (order.stopLoss - order.entryPrice) * order.quantity +
           (order.margin ?? 0);
+        pushNotification(
+          order.id,
+          `Long order stopped out at ${order.stopLoss}`
+        );
         currentOrders.splice(i, 1);
         continue;
       }
@@ -66,6 +85,10 @@ redis.on("message", (channel, message) => {
         userInMemory.balance +=
           (order.entryPrice - order.takeProfit) * order.quantity +
           (order.margin ?? 0);
+        pushNotification(
+          order.id,
+          `Long order take profit hit at ${order.takeProfit}`
+        );
         currentOrders.splice(i, 1);
         continue;
       }
@@ -74,6 +97,7 @@ redis.on("message", (channel, message) => {
         askPrice >= order.liquidationPrice
       ) {
         console.log(`Order Liquidated ${order.type}`);
+        pushNotification(order.id, `Short order liquidated at ${askPrice}`);
         currentOrders.splice(i, 1);
         continue;
       }

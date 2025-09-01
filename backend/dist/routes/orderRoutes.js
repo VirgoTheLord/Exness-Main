@@ -17,11 +17,16 @@ const ioredis_1 = __importDefault(require("ioredis"));
 const data_1 = require("../data");
 const db_1 = require("../config/db");
 const redis = new ioredis_1.default();
+const redisQ = new ioredis_1.default();
 const orderRouter = express_1.default.Router();
 const latestPrices = {};
+const pushNotification = (userId, message) => {
+    const payload = JSON.stringify({ userId, message, timestamp: Date.now() });
+    redisQ.lpush("order_notifications", payload);
+};
 redis.subscribe("trades");
-redis.on("message", (channel, message) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+redis.on("message", (channel, message) => {
+    var _a, _b, _c, _d;
     if (channel !== "trades")
         return;
     const { symbol, bid, ask } = JSON.parse(message);
@@ -29,69 +34,69 @@ redis.on("message", (channel, message) => __awaiter(void 0, void 0, void 0, func
         bid: parseFloat(bid),
         ask: parseFloat(ask),
     };
-    let i = 0;
-    while (i < data_1.currentOrders.length) {
+    for (let i = 0; i < data_1.currentOrders.length;) {
         const order = data_1.currentOrders[i];
         const symbol = order.symbol;
         const askPrice = latestPrices[symbol.toUpperCase()].ask;
         const bidPrice = latestPrices[symbol.toUpperCase()].bid;
-        try {
-            const user = yield db_1.prisma.user.findUnique({ where: { id: order.id } });
-            if (!user) {
-                i++;
+        const userInMemory = data_1.users.find((u) => u.id === order.id);
+        if (!userInMemory) {
+            i++;
+            continue;
+        }
+        if (order.type === "long") {
+            if (order.stopLoss && bidPrice <= order.stopLoss) {
+                userInMemory.balance +=
+                    (order.entryPrice - order.stopLoss) * order.quantity +
+                        ((_a = order.margin) !== null && _a !== void 0 ? _a : 0);
+                pushNotification(order.id, `Long order stopped out at ${order.stopLoss}`);
+                data_1.currentOrders.splice(i, 1);
                 continue;
             }
-            let pnl = null;
-            let closeOrder = false;
-            if (order.type === "long") {
-                if (order.stopLoss && bidPrice <= order.stopLoss) {
-                    pnl = (order.entryPrice - order.stopLoss) * order.quantity;
-                    closeOrder = true;
-                }
-                else if (order.takeProfit && bidPrice >= order.takeProfit) {
-                    pnl = (order.takeProfit - order.entryPrice) * order.quantity;
-                    closeOrder = true;
-                }
-                else if (order.liquidationPrice !== undefined &&
-                    bidPrice <= order.liquidationPrice) {
-                    closeOrder = true;
-                    console.log(`Order Liquidated ${order.type}`);
-                }
-            }
-            else if (order.type === "short") {
-                if (order.stopLoss && askPrice >= order.stopLoss) {
-                    pnl = (order.stopLoss - order.entryPrice) * order.quantity;
-                    closeOrder = true;
-                }
-                else if (order.takeProfit && askPrice <= order.takeProfit) {
-                    pnl = (order.entryPrice - order.takeProfit) * order.quantity;
-                    closeOrder = true;
-                }
-                else if (order.liquidationPrice !== undefined &&
-                    askPrice >= order.liquidationPrice) {
-                    closeOrder = true;
-                    console.log(`Order Liquidated ${order.type}`);
-                }
-            }
-            if (closeOrder) {
-                if (pnl !== null) {
-                    yield db_1.prisma.user.update({
-                        where: { id: user.id },
-                        data: { balance: { increment: pnl + ((_a = order.margin) !== null && _a !== void 0 ? _a : 0) } },
-                    });
-                }
+            if (order.takeProfit && bidPrice >= order.takeProfit) {
+                userInMemory.balance +=
+                    (order.takeProfit - order.entryPrice) * order.quantity +
+                        ((_b = order.margin) !== null && _b !== void 0 ? _b : 0);
+                pushNotification(order.id, `Long order take profit hit at ${order.takeProfit}`);
                 data_1.currentOrders.splice(i, 1);
+                continue;
             }
-            else {
-                i++;
+            if (order.liquidationPrice !== undefined &&
+                bidPrice <= order.liquidationPrice) {
+                console.log(`Order Liquidated ${order.type}`);
+                pushNotification(order.id, `Long order liquidated at ${bidPrice}`);
+                data_1.currentOrders.splice(i, 1);
+                continue;
             }
         }
-        catch (err) {
-            console.error("Error processing order:", err);
-            i++;
+        else if (order.type === "short") {
+            if (order.stopLoss && askPrice >= order.stopLoss) {
+                userInMemory.balance +=
+                    (order.stopLoss - order.entryPrice) * order.quantity +
+                        ((_c = order.margin) !== null && _c !== void 0 ? _c : 0);
+                pushNotification(order.id, `Long order stopped out at ${order.stopLoss}`);
+                data_1.currentOrders.splice(i, 1);
+                continue;
+            }
+            if (order.takeProfit && askPrice <= order.takeProfit) {
+                userInMemory.balance +=
+                    (order.entryPrice - order.takeProfit) * order.quantity +
+                        ((_d = order.margin) !== null && _d !== void 0 ? _d : 0);
+                pushNotification(order.id, `Long order take profit hit at ${order.takeProfit}`);
+                data_1.currentOrders.splice(i, 1);
+                continue;
+            }
+            if (order.liquidationPrice !== undefined &&
+                askPrice >= order.liquidationPrice) {
+                console.log(`Order Liquidated ${order.type}`);
+                pushNotification(order.id, `Short order liquidated at ${askPrice}`);
+                data_1.currentOrders.splice(i, 1);
+                continue;
+            }
         }
+        i++;
     }
-}));
+});
 orderRouter.post("/trade/:type", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const { type } = req.params;
