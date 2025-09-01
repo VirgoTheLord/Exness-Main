@@ -176,8 +176,8 @@ orderRouter.post("/trade/:type", (req, res) => {
 
 orderRouter.post("/close/:type", (req, res) => {
   const { type } = req.params;
-  const { orderId } = req.body;
-  const { id } = (req as any).user?.user.id;
+  const orderId = Number(req.body.orderId);
+  const id = (req as any).user?.user.id;
   const user = users.find((d) => d.id === id);
   if (!user) {
     return res.status(400).json({ message: "User no no balance" });
