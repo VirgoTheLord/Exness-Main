@@ -3,6 +3,7 @@ import cors from "cors";
 import pkg from "pg";
 import userRouter from "./routes/userRoutes.js";
 import orderRouter from "./routes/orderRoutes.js";
+import verifyToken from "./middleware/authMiddleware.js";
 
 const { Pool } = pkg;
 const pool = new Pool({
@@ -18,7 +19,7 @@ app.use(express.json());
 app.use(cors());
 
 app.use("/user", userRouter);
-app.use("/order", orderRouter);
+app.use("/order", verifyToken, orderRouter);
 const queries: Record<string, string> = {
   "1m": "trades_1m",
   "5m": "trades_5m",

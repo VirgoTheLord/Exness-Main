@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Charts from "../components/Charts";
 import { useCandles } from "../hooks/useCandles";
 import PricesTable from "../components/PricesTable";
+import PlaceOrderForm from "../components/PlaceOrder";
 
 const page = () => {
   const [selectedInterval, setSelectedInterval] = useState("1m");
@@ -13,7 +14,7 @@ const page = () => {
   const candles = useCandles(symbol, selectedInterval);
 
   return (
-    <div className="bg-black w-screen min-h-screen">
+    <div className="bg-black w-full min-h-screen">
       <div className="h-15 bg-neutral-900 flex justify-between items-center px-4">
         <h1 className="text-white text-lg font-semibold">Exness</h1>
       </div>
@@ -42,11 +43,12 @@ const page = () => {
           </select>
         </div>
         <div className="flex ">
-          <div className="w-3/4 pl-2">
+          <div className="w-3/4 pl-2 pt-2">
             <Charts candles={candles} height={600} />
           </div>
-          <div className="w-1/4">
+          <div className="w-1/4 flex justify-center items-center flex-col gap-4">
             <PricesTable />
+            <PlaceOrderForm symbol={symbol} />
           </div>
         </div>
       </div>

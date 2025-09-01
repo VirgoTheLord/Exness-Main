@@ -16,6 +16,7 @@ export interface order {
   orderId: number;
   id: number;
   type: string;
+  symbol: string;
   entryPrice: number;
   quantity: number;
   margin?: number;
