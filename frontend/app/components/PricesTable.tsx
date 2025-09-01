@@ -15,27 +15,29 @@ const PricesTable = () => {
             </th>
             <th className="border border-gray-700 px-4 py-2 text-left">Ask</th>
             <th className="border border-gray-700 px-4 py-2 text-left">Bid</th>
-            <th className="border border-gray-700 px-4 py-2 text-left">
-              Status
-            </th>
           </tr>
         </thead>
         <tbody>
           {Object.entries(prices).map(([symbol, { ask, bid, status }]) => (
             <tr key={symbol} className="odd:bg-gray-800 even:bg-gray-700">
               <td className="border border-gray-700 px-4 py-2">{symbol}</td>
-              <td className="border border-gray-700 px-4 py-2">
-                {ask.toFixed(2)}
-              </td>
-              <td className="border border-gray-700 px-4 py-2">
-                {bid.toFixed(2)}
-              </td>
+
+              {/* Ask cell */}
               <td
                 className={`border border-gray-700 px-4 py-2 font-bold ${
                   status === "up" ? "text-green-400" : "text-red-400"
                 }`}
               >
-                {status.toUpperCase()}
+                {ask.toFixed(2)}
+              </td>
+
+              {/* Bid cell */}
+              <td
+                className={`border border-gray-700 px-4 py-2 font-bold ${
+                  status === "up" ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {bid.toFixed(2)}
               </td>
             </tr>
           ))}

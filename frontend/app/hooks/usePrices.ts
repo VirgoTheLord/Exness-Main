@@ -30,12 +30,12 @@ export const usePrices = () => {
         }
         const prevAsk: number = prevData.ask;
 
-        const status: "up" | "down" =
-          prevAsk > ask
-            ? "up"
-            : prevAsk < bid
-            ? "down"
-            : prevData.status ?? "up";
+        let status: "up" | "down" = prevData.status ?? "up";
+        if (ask > prevAsk) {
+          status = "up";
+        } else if (ask < prevAsk) {
+          status = "down";
+        }
 
         pricesRef.current[symbol] = { ask, bid, status };
 

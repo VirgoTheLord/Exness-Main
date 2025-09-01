@@ -41,9 +41,13 @@ const page = () => {
             ))}
           </select>
         </div>
-        <div className="w-3/4 pl-2">
-          <Charts candles={candles} height={600} />
-          <PricesTable />
+        <div className="flex ">
+          <div className="w-3/4 pl-2">
+            <Charts candles={candles} height={600} />
+          </div>
+          <div className="w-1/4">
+            <PricesTable />
+          </div>
         </div>
       </div>
     </div>
