@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 export default function usePlaceOrder(symbol: string) {
@@ -7,9 +7,13 @@ export default function usePlaceOrder(symbol: string) {
   const [takeProfit, setTakeProfit] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [type, setType] = useState<"long" | "short">("long");
+  const [token, setToken] = useState<string>("");
+
+  useEffect(() => {
+    setToken(localStorage.getItem("token") || "");
+  }, []);
 
   const handlePlaceOrder = async () => {
-    const token = localStorage.getItem("token");
     try {
       const response = await axios.post(
         `http://localhost:5000/order/trade/${type}`,

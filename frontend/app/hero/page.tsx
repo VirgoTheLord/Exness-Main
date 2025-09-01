@@ -4,6 +4,7 @@ import Charts from "../components/Charts";
 import { useCandles } from "../hooks/useCandles";
 import PricesTable from "../components/PricesTable";
 import PlaceOrderForm from "../components/PlaceOrder";
+import OrdersTable from "../components/OrdersTable";
 
 const page = () => {
   const [selectedInterval, setSelectedInterval] = useState("1m");
@@ -51,6 +52,7 @@ const page = () => {
             <PlaceOrderForm symbol={symbol} />
           </div>
         </div>
+        <OrdersTable />
       </div>
     </div>
   );

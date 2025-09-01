@@ -17,6 +17,7 @@ const cors_1 = __importDefault(require("cors"));
 const pg_1 = __importDefault(require("pg"));
 const userRoutes_js_1 = __importDefault(require("./routes/userRoutes.js"));
 const orderRoutes_js_1 = __importDefault(require("./routes/orderRoutes.js"));
+const authMiddleware_js_1 = __importDefault(require("./middleware/authMiddleware.js"));
 const { Pool } = pg_1.default;
 const pool = new Pool({
     host: "localhost",
@@ -30,7 +31,7 @@ const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.use((0, cors_1.default)());
 app.use("/user", userRoutes_js_1.default);
-app.use("/order", orderRoutes_js_1.default);
+app.use("/order", authMiddleware_js_1.default, orderRoutes_js_1.default);
 const queries = {
     "1m": "trades_1m",
     "5m": "trades_5m",

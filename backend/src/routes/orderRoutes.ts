@@ -83,7 +83,7 @@ redis.on("message", (channel, message) => {
 orderRouter.post("/trade/:type", (req, res) => {
   const { type } = req.params;
   const { leverage, symbol, stopLoss, takeProfit, quantity } = req.body;
-  const id = (req as any).user?.id;
+  const id = (req as any).user?.user.id;
   const user = users.find((f) => f.id === id);
   if (!user) {
     return res.json({ message: "Login to trade" });
@@ -208,11 +208,9 @@ orderRouter.post("/close/:type", (req, res) => {
 });
 
 orderRouter.get("/getOrders", (req, res) => {
-  const { id } = (req as any).user?.user.id;
+  const id = (req as any).user?.user.id;
   const userOrders = currentOrders.filter((f) => f.id === id);
-  if (userOrders.length === 0) {
-    return res.status(500).json("No orders found");
-  }
+
   return res.json(userOrders);
 });
 

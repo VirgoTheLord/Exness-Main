@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const ioredis_1 = __importDefault(require("ioredis"));
 const data_1 = require("../data");
-const authMiddleware_1 = __importDefault(require("../middleware/authMiddleware"));
 const redis = new ioredis_1.default();
 const orderRouter = express_1.default.Router();
 const latestPrices = {};
@@ -78,11 +77,11 @@ redis.on("message", (channel, message) => {
         }
     }
 });
-orderRouter.post("/trade/:type", authMiddleware_1.default, (req, res) => {
+orderRouter.post("/trade/:type", (req, res) => {
     var _a;
     const { type } = req.params;
     const { leverage, symbol, stopLoss, takeProfit, quantity } = req.body;
-    const id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+    const id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.user.id;
     const user = data_1.users.find((f) => f.id === id);
     if (!user) {
         return res.json({ message: "Login to trade" });
@@ -198,5 +197,11 @@ orderRouter.post("/close/:type", (req, res) => {
         }
         return res.json({ message: "order closed" });
     }
+});
+orderRouter.get("/getOrders", (req, res) => {
+    var _a;
+    const id = (_a = req.user) === null || _a === void 0 ? void 0 : _a.user.id;
+    const userOrders = data_1.currentOrders.filter((f) => f.id === id);
+    return res.json(userOrders);
 });
 exports.default = orderRouter;
