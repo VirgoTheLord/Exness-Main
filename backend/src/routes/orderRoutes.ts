@@ -2,89 +2,98 @@ import express from "express";
 import Redis from "ioredis";
 import { LatestPrices, Order } from "../types/allTypes";
 import { currentOrders, users } from "../data";
-import verifyToken from "../middleware/authMiddleware";
+import { prisma } from "../config/db";
+import { idText } from "typescript";
 const redis = new Redis();
 
 const orderRouter = express.Router();
 const latestPrices: Record<string, LatestPrices> = {};
 
 redis.subscribe("trades");
-redis.on("message", (channel, message) => {
-  if (channel === "trades") {
-    const { symbol, bid, ask } = JSON.parse(message);
-    latestPrices[symbol.toUpperCase()] = {
-      bid: parseFloat(bid),
-      ask: parseFloat(ask),
-    };
+redis.on("message", async (channel, message) => {
+  if (channel !== "trades") return;
 
-    for (let i = 0; i < currentOrders.length; ) {
-      const order = currentOrders[i];
-      const symbol = order.symbol;
-      const ask = latestPrices[symbol.toUpperCase()].ask;
-      const bid = latestPrices[symbol.toUpperCase()].bid;
-      const id = currentOrders[i].id;
-      const user = users.find((f) => f.id === id);
+  const { symbol, bid, ask } = JSON.parse(message);
+  latestPrices[symbol.toUpperCase()] = {
+    bid: parseFloat(bid),
+    ask: parseFloat(ask),
+  };
+
+  let i = 0;
+  while (i < currentOrders.length) {
+    const order = currentOrders[i];
+    const symbol = order.symbol;
+    const askPrice = latestPrices[symbol.toUpperCase()].ask;
+    const bidPrice = latestPrices[symbol.toUpperCase()].bid;
+
+    try {
+      const user = await prisma.user.findUnique({ where: { id: order.id } });
+      if (!user) {
+        i++;
+        continue;
+      }
+
+      let pnl: number | null = null;
+      let closeOrder = false;
+
       if (order.type === "long") {
-        if (order.stopLoss && bid <= order.stopLoss) {
-          const pnl = (order.entryPrice - order.stopLoss) * order.quantity;
-          if (user) {
-            user.balance += pnl + (order.margin ?? 0);
-          }
-          currentOrders.splice(i, 1);
-          continue;
-        }
-        if (order.takeProfit && bid >= order.takeProfit) {
-          const pnl = (order.takeProfit - order.entryPrice) * order.quantity;
-          if (user) {
-            user.balance += pnl + (order.margin ?? 0);
-          }
-          currentOrders.splice(i, 1);
-          continue;
-        }
-        if (
+        if (order.stopLoss && bidPrice <= order.stopLoss) {
+          pnl = (order.entryPrice - order.stopLoss) * order.quantity;
+          closeOrder = true;
+        } else if (order.takeProfit && bidPrice >= order.takeProfit) {
+          pnl = (order.takeProfit - order.entryPrice) * order.quantity;
+          closeOrder = true;
+        } else if (
           order.liquidationPrice !== undefined &&
-          bid <= order.liquidationPrice
+          bidPrice <= order.liquidationPrice
         ) {
-          currentOrders.splice(i, 1);
+          closeOrder = true;
           console.log(`Order Liquidated ${order.type}`);
-          continue;
         }
       } else if (order.type === "short") {
-        if (order.stopLoss && ask >= order.stopLoss) {
-          const pnl = (order.stopLoss - order.entryPrice) * order.quantity;
-          if (user) {
-            user.balance += pnl + (order.margin ?? 0);
-          }
-          currentOrders.splice(i, 1);
-          continue;
-        }
-        if (order.takeProfit && ask <= order.takeProfit) {
-          const pnl = (order.entryPrice - order.takeProfit) * order.quantity;
-          if (user) {
-            user.balance += pnl + (order.margin ?? 0);
-          }
-          currentOrders.splice(i, 1);
-          continue;
-        }
-        if (
+        if (order.stopLoss && askPrice >= order.stopLoss) {
+          pnl = (order.stopLoss - order.entryPrice) * order.quantity;
+          closeOrder = true;
+        } else if (order.takeProfit && askPrice <= order.takeProfit) {
+          pnl = (order.entryPrice - order.takeProfit) * order.quantity;
+          closeOrder = true;
+        } else if (
           order.liquidationPrice !== undefined &&
-          ask >= order.liquidationPrice
+          askPrice >= order.liquidationPrice
         ) {
-          currentOrders.splice(i, 1);
+          closeOrder = true;
           console.log(`Order Liquidated ${order.type}`);
-          continue;
         }
       }
+
+      if (closeOrder) {
+        if (pnl !== null) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { balance: { increment: pnl + (order.margin ?? 0) } },
+          });
+        }
+
+        currentOrders.splice(i, 1);
+      } else {
+        i++;
+      }
+    } catch (err) {
+      console.error("Error processing order:", err);
       i++;
     }
   }
 });
 
-orderRouter.post("/trade/:type", (req, res) => {
+orderRouter.post("/trade/:type", async (req, res) => {
   const { type } = req.params;
   const { leverage, symbol, stopLoss, takeProfit, quantity } = req.body;
   const id = (req as any).user?.user.id;
-  const user = users.find((f) => f.id === id);
+  const user = await prisma.user.findUnique({
+    where: {
+      id: id,
+    },
+  });
   if (!user) {
     return res.json({ message: "Login to trade" });
   }
@@ -111,7 +120,14 @@ orderRouter.post("/trade/:type", (req, res) => {
       return res.status(400).json({ message: "Insuffiecient funds" });
     }
     //ideally should be using a usable part of balance here and split
-    user.balance -= margin;
+    await prisma.user.update({
+      where: {
+        id: id,
+      },
+      data: {
+        balance: { decrement: margin },
+      },
+    });
     //margin = valuation/leverage
     //pnl = buyprice - entryprice * qty
     //margin = pnl for liquidation
@@ -152,7 +168,14 @@ orderRouter.post("/trade/:type", (req, res) => {
     if (margin > userBalance) {
       return res.status(400).json({ message: "Inefficient Funds" });
     }
-    user.balance -= margin;
+    await prisma.user.update({
+      where: {
+        id: id,
+      },
+      data: {
+        balance: { decrement: margin },
+      },
+    });
 
     const liquidate = sellPrice * (1 + 1 / lev);
     const newOrder: Order = {
@@ -174,11 +197,15 @@ orderRouter.post("/trade/:type", (req, res) => {
   }
 });
 
-orderRouter.post("/close/:type", (req, res) => {
+orderRouter.post("/close/:type", async (req, res) => {
   const { type } = req.params;
   const orderId = Number(req.body.orderId);
   const id = (req as any).user?.user.id;
-  const user = users.find((d) => d.id === id);
+  const user = await prisma.user.findUnique({
+    where: {
+      id: id,
+    },
+  });
   if (!user) {
     return res.status(400).json({ message: "User no no balance" });
   }
@@ -189,7 +216,14 @@ orderRouter.post("/close/:type", (req, res) => {
   if (type.toLowerCase() === "long") {
     const currentSellingPrice = latestPrices[order.symbol.toUpperCase()].bid;
     const pnl = (currentSellingPrice - order.entryPrice) * order.quantity;
-    user.balance += pnl + (order.margin ?? 0);
+    await prisma.user.update({
+      where: {
+        id: id,
+      },
+      data: {
+        balance: { decrement: pnl + (order.margin ?? 0) },
+      },
+    });
     const orderIndex = currentOrders.findIndex((f) => f.orderId === orderId);
     if (orderIndex !== -1) {
       currentOrders.splice(orderIndex, 1);
@@ -198,7 +232,14 @@ orderRouter.post("/close/:type", (req, res) => {
   } else if (type.toLowerCase() === "short") {
     const currentBuyingPrice = latestPrices[order.symbol.toUpperCase()].ask;
     const pnl = (order.entryPrice - currentBuyingPrice) * order.quantity;
-    user.balance += pnl + (order.margin ?? 0);
+    await prisma.user.update({
+      where: {
+        id: id,
+      },
+      data: {
+        balance: { decrement: pnl + (order.margin ?? 0) },
+      },
+    });
     const orderIndex = currentOrders.findIndex((f) => f.orderId === orderId);
     if (orderIndex !== -1) {
       currentOrders.splice(orderIndex, 1);

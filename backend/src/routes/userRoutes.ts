@@ -1,26 +1,27 @@
 import express from "express";
-import { User } from "../types/allTypes";
-import { users } from "../data";
+
 import jwt from "jsonwebtoken";
+import { prisma } from "../config/db";
 
 const userRouter = express.Router();
-const secret = "1234";
-
-userRouter.post("/signup", (req, res) => {
+userRouter.post("/signup", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = users.find((f) => f.email === email);
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
     if (user) {
       console.log("User Already Exists");
       return res.status(400).json({ message: "User exists, login" });
     }
-    const newUser: User = {
-      id: users.length + 1,
-      email,
-      password,
-      balance: 0,
-    };
-    users.push(newUser);
+    await prisma.user.create({
+      data: {
+        email: email,
+        password: password,
+      },
+    });
 
     return res.status(200).json({ message: "User Signed Up succesfully" });
   } catch (error) {
@@ -29,19 +30,21 @@ userRouter.post("/signup", (req, res) => {
   }
 });
 
-userRouter.post("/login", (req, res) => {
+userRouter.post("/login", async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = users.find(
-      (f) => f.email === email && f.password === password
-    );
+    const user = await prisma.user.findUnique({
+      where: {
+        email: email,
+      },
+    });
     if (!user) {
       console.log("User does not exist yet");
       return res.status(400).json({ message: "User has not signed up yet" });
     }
     const token = jwt.sign(
       { user: { email: user.email, id: user.id } },
-      secret
+      process.env.JWT_SECRET as string
     );
     console.log("Login Successfully");
     return res.status(200).json({ message: "Logged In", token: token });
@@ -51,10 +54,14 @@ userRouter.post("/login", (req, res) => {
   }
 });
 
-userRouter.get("/getBalance", (req, res) => {
+userRouter.get("/getBalance", async (req, res) => {
   const { id } = (req as any).query;
   try {
-    const user = users.find((f) => f.id === id);
+    const user = await prisma.user.findUnique({
+      where: {
+        id: id,
+      },
+    });
     if (!user) {
       console.log("No user found");
       return res.status(400).json({ message: "Id is wrong or does not exist" });

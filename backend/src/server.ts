@@ -4,6 +4,8 @@ import pkg from "pg";
 import userRouter from "./routes/userRoutes.js";
 import orderRouter from "./routes/orderRoutes.js";
 import verifyToken from "./middleware/authMiddleware.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const { Pool } = pkg;
 const pool = new Pool({
