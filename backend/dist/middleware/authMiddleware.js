@@ -5,14 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = verifyToken;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const secret = "1234";
 function verifyToken(req, res, next) {
     try {
         const token = req.headers["token"];
         if (!token) {
             return res.status(400).json({ message: "No token" });
         }
-        const decoded = jsonwebtoken_1.default.verify(token, secret);
+        const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
         req.user = decoded;
         next();
     }

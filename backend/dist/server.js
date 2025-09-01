@@ -18,6 +18,8 @@ const pg_1 = __importDefault(require("pg"));
 const userRoutes_js_1 = __importDefault(require("./routes/userRoutes.js"));
 const orderRoutes_js_1 = __importDefault(require("./routes/orderRoutes.js"));
 const authMiddleware_js_1 = __importDefault(require("./middleware/authMiddleware.js"));
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 const { Pool } = pg_1.default;
 const pool = new Pool({
     host: "localhost",

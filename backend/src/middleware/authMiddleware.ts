@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const secret = "1234";
-
 export default function verifyToken(
   req: Request,
   res: Response,
@@ -14,7 +12,10 @@ export default function verifyToken(
       return res.status(400).json({ message: "No token" });
     }
 
-    const decoded = jwt.verify(token as string, secret);
+    const decoded = jwt.verify(
+      token as string,
+      process.env.JWT_SECRET as string
+    );
     (req as any).user = decoded;
     next();
   } catch (error) {

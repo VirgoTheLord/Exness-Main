@@ -10,7 +10,7 @@ const orderRouter = express.Router();
 const latestPrices: Record<string, LatestPrices> = {};
 
 redis.subscribe("trades");
-redis.on("message", async (channel, message) => {
+redis.on("message", (channel, message) => {
   if (channel !== "trades") return;
 
   const { symbol, bid, ask } = JSON.parse(message);
@@ -19,69 +19,67 @@ redis.on("message", async (channel, message) => {
     ask: parseFloat(ask),
   };
 
-  let i = 0;
-  while (i < currentOrders.length) {
+  for (let i = 0; i < currentOrders.length; ) {
     const order = currentOrders[i];
     const symbol = order.symbol;
     const askPrice = latestPrices[symbol.toUpperCase()].ask;
     const bidPrice = latestPrices[symbol.toUpperCase()].bid;
 
-    try {
-      const user = await prisma.user.findUnique({ where: { id: order.id } });
-      if (!user) {
-        i++;
+    const userInMemory = users.find((u) => u.id === order.id);
+    if (!userInMemory) {
+      i++;
+      continue;
+    }
+
+    if (order.type === "long") {
+      if (order.stopLoss && bidPrice <= order.stopLoss) {
+        userInMemory.balance +=
+          (order.entryPrice - order.stopLoss) * order.quantity +
+          (order.margin ?? 0);
+        currentOrders.splice(i, 1);
         continue;
       }
-
-      let pnl: number | null = null;
-      let closeOrder = false;
-
-      if (order.type === "long") {
-        if (order.stopLoss && bidPrice <= order.stopLoss) {
-          pnl = (order.entryPrice - order.stopLoss) * order.quantity;
-          closeOrder = true;
-        } else if (order.takeProfit && bidPrice >= order.takeProfit) {
-          pnl = (order.takeProfit - order.entryPrice) * order.quantity;
-          closeOrder = true;
-        } else if (
-          order.liquidationPrice !== undefined &&
-          bidPrice <= order.liquidationPrice
-        ) {
-          closeOrder = true;
-          console.log(`Order Liquidated ${order.type}`);
-        }
-      } else if (order.type === "short") {
-        if (order.stopLoss && askPrice >= order.stopLoss) {
-          pnl = (order.stopLoss - order.entryPrice) * order.quantity;
-          closeOrder = true;
-        } else if (order.takeProfit && askPrice <= order.takeProfit) {
-          pnl = (order.entryPrice - order.takeProfit) * order.quantity;
-          closeOrder = true;
-        } else if (
-          order.liquidationPrice !== undefined &&
-          askPrice >= order.liquidationPrice
-        ) {
-          closeOrder = true;
-          console.log(`Order Liquidated ${order.type}`);
-        }
-      }
-
-      if (closeOrder) {
-        if (pnl !== null) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { balance: { increment: pnl + (order.margin ?? 0) } },
-          });
-        }
-
+      if (order.takeProfit && bidPrice >= order.takeProfit) {
+        userInMemory.balance +=
+          (order.takeProfit - order.entryPrice) * order.quantity +
+          (order.margin ?? 0);
         currentOrders.splice(i, 1);
-      } else {
-        i++;
+        continue;
       }
-    } catch (err) {
-      console.error("Error processing order:", err);
-      i++;
+      if (
+        order.liquidationPrice !== undefined &&
+        bidPrice <= order.liquidationPrice
+      ) {
+        console.log(`Order Liquidated ${order.type}`);
+        currentOrders.splice(i, 1);
+        continue;
+      }
+    } else if (order.type === "short") {
+      if (order.stopLoss && askPrice >= order.stopLoss) {
+        userInMemory.balance +=
+          (order.stopLoss - order.entryPrice) * order.quantity +
+          (order.margin ?? 0);
+        currentOrders.splice(i, 1);
+        continue;
+      }
+      if (order.takeProfit && askPrice <= order.takeProfit) {
+        userInMemory.balance +=
+          (order.entryPrice - order.takeProfit) * order.quantity +
+          (order.margin ?? 0);
+        currentOrders.splice(i, 1);
+        continue;
+      }
+      if (
+        order.liquidationPrice !== undefined &&
+        askPrice >= order.liquidationPrice
+      ) {
+        console.log(`Order Liquidated ${order.type}`);
+        currentOrders.splice(i, 1);
+        continue;
+      }
     }
+
+    i++;
   }
 });
 
