@@ -1,5 +1,12 @@
 import Redis from "ioredis";
+import dotenv from "dotenv";
+dotenv.config();
+
 import { sendMail } from "./mail.js";
+
+console.log("SMTP_HOST:", process.env.SMTP_HOST);
+console.log("SMTP_PORT:", process.env.SMTP_PORT);
+console.log("EMAIL_USER:", process.env.EMAIL_USER);
 
 const redis = new Redis();
 const TARGET_EMAIL = process.env.TARGET_EMAIL as string;

@@ -1,9 +1,8 @@
-import express from "express";
+import express, { Request } from "express";
 import Redis from "ioredis";
 import { LatestPrices, Order } from "../types/allTypes";
 import { currentOrders, users } from "../data";
 import { prisma } from "../config/db";
-import { idText } from "typescript";
 const redis = new Redis();
 const redisQ = new Redis();
 
